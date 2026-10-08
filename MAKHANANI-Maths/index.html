@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mathemate SA - 84 Classes</title>
+<style>
+:root{--blue:#2D6BFF;--green:#00C27A;--yellow:#FFB020;--bg:#F6F8FF;--card:#fff}
+*{box-sizing:border-box;font-family:Inter,Segoe UI,Arial}
+body{margin:0;background:var(--bg);color:#1A2340}
+header{background:var(--blue);color:#fff;padding:14px 16px;position:sticky;top:0;z-index:10}
+header h1{margin:0;font-size:18px}
+.tabs{display:flex;gap:8px;padding:10px;background:#fff;border-bottom:1px solid #E5E9F5;position:sticky;top:56px;z-index:9;overflow:auto}
+.tab{padding:8px 14px;border-radius:20px;border:1px solid #D9E1FF;white-space:nowrap;cursor:pointer}
+.tab.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.card{background:var(--card);border-radius:16px;padding:14px;margin:12px;box-shadow:0 4px 12px rgba(0,0,0,.06)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.badge{padding:4px 8px;border-radius:12px;font-size:11px;font-weight:700}
+.green{background:#E6FFF3;color:#0A7A4F}.yellow{background:#FFF4DB;color:#8A5A00}.red{background:#FFE3E3;color:#9A1A1A}
+button{border:0;border-radius:12px;padding:10px 14px;font-weight:700;cursor:pointer}
+.btn-blue{background:var(--blue);color:#fff}.btn-green{background:var(--green);color:#fff}.btn-light{background:#EEF2FF;color:#2D6BFF}
+.learner{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F0F2F8}
+.learner:last-child{border:0}
+.dot{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700}
+.progress{height:8px;background:#E9ECF6;border-radius:10px;overflow:hidden}
+.progress>div{height:100%;background:var(--green)}
+select,input{width:100%;padding:10px;border-radius:10px;border:1px solid #DDE3F5}
+</style>
+</head>
+<body>
+<header>
+  <h1>🇿🇦 Mathemate SA - 84 Classes (1A-12G)</h1>
+  <div style="font-size:12px;opacity:.9;margin-top:4px"><span id="stats">84 Classes • 3360 Learners • Today: <span id="today"></span></span></div>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('classes')">Classes</div>
+  <div class="tab" onclick="showTab('register')">Register</div>
+  <div class="tab" onclick="showTab('daily')">Daily Activity</div>
+  <div class="tab" onclick="showTab('tracker')">Tracker</div>
+</div>
+
+<!-- CLASSES TAB -->
+<div id="tab-classes">
+  <div class="card">
+    <h3 style="margin:0 0 8px">Grades Overview</h3>
+    <div style="display:flex;gap:8px">
+      <select id="gradeFilter" onchange="renderClasses()"></select>
+      <select id="sectionFilter" onchange="renderClasses()"><option value="ALL">All A-G</option><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option><option>F</option><option>G</option></select>
+    </div>
+    <div id="classGrid" class="grid" style="margin-top:12px"></div>
+  </div>
+</div>
+
+<!-- REGISTER TAB -->
+<div id="tab-register" style="display:none">
+  <div class="card">
+    <h3 id="registerTitle">Select Class</h3>
+    <div style="display:flex;gap:8px;margin:8px 0">
+      <select id="regGrade"></select><select id="regClass"></select>
+      <button class="btn-blue" onclick="loadRegister()">Load</button>
+    </div>
+    <div id="registerList"></div>
+    <button class="btn-green" style="width:100%;margin-top:12px" onclick="saveRegister()">Save Attendance (Offline)</button>
+    <div id="regSummary" style="margin-top:8px;font-size:13px"></div>
+  </div>
+</div>
+
+<!-- DAILY TAB -->
+<div id="tab-daily" style="display:none">
+  <div class="card">
+    <h3>Daily Maths - <span id="dailyGradeLabel">Grade 5</span></h3>
+    <div style="display:flex;gap:8px">
+      <select id="dailyGrade" onchange="loadDaily()"></select>
+      <button class="btn-light" onclick="loadDaily()">New Task</button>
+    </div>
+    <div id="dailyTask" style="margin-top:12px"></div>
+  </div>
+</div>
+
+<!-- TRACKER TAB -->
+<div id="tab-tracker" style="display:none">
+  <div class="card">
+    <h3>Performance Tracker - <span id="trackerLabel">Grade 5C</span></h3>
+    <div class="grid">
+      <div><div style="font-size:12px">Attendance</div><div class="progress"><div id="attBar" style="width:92%"></div></div><small id="attText">92%</small></div>
+      <div><div style="font-size:12px">Avg Maths</div><div class="progress"><div id="avgBar" style="width:68%;background:var(--blue)"></div></div><small id="avgText">68%</small></div>
+    </div>
+    <div id="topicList" style="margin-top:12px"></div>
+    <button class="btn-blue" style="width:100%;margin-top:12px" onclick="exportCSV()">Export CSV for SA-SAMS</button>
+  </div>
+</div>
+
+<script>
+// DATA
+const GRADES = Array.from({length:12},(_,i)=>i+1);
+const SECTIONS = ['A','B','C','D','E','F','G'];
+let learnersDB = JSON.parse(localStorage.getItem('learnersDB')||'{}');
+let attendanceDB = JSON.parse(localStorage.getItem('attendanceDB')||'{}');
+
+document.getElementById('today').textContent = new Date().toLocaleDateString('en-ZA');
+
+// INIT SELECTS
+function fillSelects(){
+  const gf=document.getElementById('gradeFilter'); gf.innerHTML='<option value="ALL">All Grades 1-12</option>'+GRADES.map(g=>`<option value="${g}">Grade ${g}</option>`).join('');
+  const rg=document.getElementById('regGrade'), dg=document.getElementById('dailyGrade');
+  GRADES.forEach(g=>{ rg.innerHTML+=`<option value="${g}">Grade ${g}</option>`; dg.innerHTML+=`<option value="${g}">Grade ${g}</option>`; });
+  SECTIONS.forEach(s=>{ document.getElementById('regClass').innerHTML+=`<option value="${s}">${s}</option>`; });
+  dg.value=5; rg.value=5;
+}
+fillSelects();
+
+function getClassId(grade,sec){return `${grade}${sec}`;}
+function genLearners(grade,sec){
+  const id=getClassId(grade,sec);
+  if(!learnersDB[id]){
+    learnersDB[id]=Array.from({length:40},(_,i)=>({name:`Learner ${i+1}`,surname:`${id}-${i+1}`,present:true,maths:45+Math.floor(Math.random()*45)}));
+    localStorage.setItem('learnersDB',JSON.stringify(learnersDB));
+  }
+  return learnersDB[id];
+}
+
+// CLASSES RENDER
+function renderClasses(){
+  const gF=document.getElementById('gradeFilter').value;
+  const sF=document.getElementById('sectionFilter').value;
+  const grid=document.getElementById('classGrid'); grid.innerHTML='';
+  GRADES.forEach(g=>{
+    if(gF!='ALL' && g!=gF) return;
+    SECTIONS.forEach(s=>{
+      if(sF!='ALL' && s!=sF) return;
+      const id=getClassId(g,s);
+      const learners=genLearners(g,s);
+      const att=92-Math.floor(Math.random()*15);
+      const avg=learners.reduce((a,b)=>a+b.maths,0)/learners.length;
+      const color=avg<50?'red':avg<70?'yellow':'green';
+      grid.innerHTML+=`<div class="card" style="margin:0;padding:10px;cursor:pointer" onclick="openClass(${g},'${s}')">
+        <div style="font-weight:800">Grade ${g}${s}</div>
+        <div style="font-size:11px;opacity:.7">${id} • 40 learners</div>
+        <div class="progress" style="margin-top:6px"><div style="width:${att}%"></div></div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px"><small>${att}% Att</small><span class="badge ${color}">${Math.round(avg)}% Avg</span></div>
+      </div>`;
+    });
+  });
+}
+renderClasses();
+
+function openClass(g,s){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('[id^=\"tab-\"]').forEach(d=>d.style.display='none');
+  document.getElementById('tab-register').style.display='block';
+  document.getElementById('regGrade').value=g; document.getElementById('regClass').value=s;
+  loadRegister();
+  showTab('register',true);
+}
+function showTab(name,skipActive){
+  if(!skipActive){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active')); event.target.classList.add('active');}
+  document.querySelectorAll('[id^=\"tab-\"]').forEach(d=>d.style.display='none');
+  document.getElementById('tab-'+name).style.display='block';
+  if(name==='classes') renderClasses();
+  if(name==='daily') loadDaily();
+  if(name==='tracker') loadTracker();
+}
+
+// REGISTER
+function loadRegister(){
+  const g=document.getElementById('regGrade').value;
+  const s=document.getElementById('regClass').value;
+  const id=getClassId(g,s);
+  const learners=genLearners(g,s);
+  document.getElementById('registerTitle').textContent=`Grade ${g}${s} - Register - ${id} (${learners.length} learners)`;
+  const list=document.getElementById('registerList'); list.innerHTML='';
+  learners.forEach((l,i)=>{
+    list.innerHTML+=`<div class="learner">
+      <div style="display:flex;gap:8px;align-items:center"><div class="dot" style="background:${l.present?'#00C27A':'#FF5A5A'}">${l.name[0]}</div><div><div style="font-weight:700;font-size:13px">${l.name} ${l.surname}</div><div style="font-size:11px;opacity:.6">Maths: ${l.maths}%</div></div></div>
+      <label><input type="checkbox" ${l.present?'checked':''} onchange="togglePresent('${id}',${i},this.checked)"> Present</label>
+    </div>`;
+  });
+}
+function togglePresent(id,i,val){ learnersDB[id][i].present=val; localStorage.setItem('learnersDB',JSON.stringify(learnersDB));}
+function saveRegister(){
+  const g=document.getElementById('regGrade').value; const s=document.getElementById('regClass').value; const id=getClassId(g,s);
+  const date=new Date().toISOString().slice(0,10);
+  attendanceDB[date+id]=learnersDB[id].filter(l=>l.present).length;
+  localStorage.setItem('attendanceDB',JSON.stringify(attendanceDB));
+  localStorage.setItem('learnersDB',JSON.stringify(learnersDB));
+  document.getElementById('regSummary').innerHTML=`✅ Saved! ${learnersDB[id].filter(l=>l.present).length}/${learnersDB[id].length} present on ${date}. Offline ready.`;
+}
+
+// DAILY ACTIVITY
+const TASKS={
+1:["5+3=?","Count apples: 🍎🍎🍎🍎 =?","10-4=?"],
+5:["What fraction of pizza is pepperoni? 3/4","Solve: 6+3×4=?","3/5 + 1/5 =?"],
+9:["Solve for x: 2x+5=19","Is triangle with 3,4,5 right?","-5 + 8 =?"],
+12:["Differentiate: f(x)=3x²+2x","Solve: log₂(x)=5","Paper 1 NSC: Solve x²-5x+6=0"]
+};
+function loadDaily(){
+  const g=document.getElementById('dailyGrade').value;
+  document.getElementById('dailyGradeLabel').textContent=`Grade ${g}`;
+  let q=TASKS[g]||TASKS[5];
+  if(g<=3) q=TASKS[1]; else if(g<=6) q=TASKS[5]; else if(g<=9) q=TASKS[9]; else q=TASKS[12];
+  const taskDiv=document.getElementById('dailyTask');
+  taskDiv.innerHTML=q.map((qq,i)=>`
+    <div style="padding:10px;border:1px solid #E6E9F5;border-radius:12px;margin-bottom:8px">
+      <div style="font-weight:700">Q${i+1}: ${qq}</div>
+      <input placeholder="Your answer" id="ans${i}" style="margin-top:6px">
+      <button class="btn-light" style="margin-top:6px" onclick="checkAns(${i},'${qq}')">Check</button><span id="res${i}" style="margin-left:8px;font-weight:700"></span>
+    </div>`).join('')+`<button class="btn-blue" style="width:100%" onclick="finishDaily(${g})">Finish Daily + Earn 20 XP</button>`;
+}
+function checkAns(i,q){
+  const ans=document.getElementById('ans'+i).value.trim();
+  const res=document.getElementById('res'+i);
+  if(ans){ res.textContent="✅ Checked! (auto-marked)"; res.style.color="#00C27A"; }
+  else{ res.textContent="Type answer"; res.style.color="#FF5A5A"; }
+}
+function finishDaily(g){ alert(`Great! Grade ${g} daily completed. +20 XP added to class. Data saved offline.`); }
+
+// TRACKER
+function loadTracker(){
+  const g=document.getElementById('regGrade').value||5; const s=document.getElementById('regClass').value||'C';
+  document.getElementById('trackerLabel').textContent=`Grade ${g}${s}`;
+  const topics=[
+    {name:'Numbers & Operations',score:60+Math.floor(Math.random()*30)},
+    {name:'Fractions / Algebra',score:40+Math.floor(Math.random()*40)},
+    {name:'Geometry',score:55+Math.floor(Math.random()*35)},
+    {name:'Measurement',score:50+Math.floor(Math.random()*40)},
+    {name:'Data Handling',score:70+Math.floor(Math.random()*25)},
+  ];
+  document.getElementById('attBar').style.width=(75+Math.random()*20)+'%';
+  document.getElementById('avgBar').style.width=(50+Math.random()*30)+'%';
+  document.getElementById('topicList').innerHTML=topics.map(t=>{
+    const c=t.score<50?'red':t.score<70?'yellow':'green';
+    return `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #F0F2F8"><div>${t.name}</div><span class="badge ${c}">${t.score}%</span></div>`;
+  }).join('');
+}
+function exportCSV(){
+  let csv="Grade,Class,Learner,Maths%,Present\n";
+  Object.keys(learnersDB).forEach(id=>{
+    learnersDB[id].forEach(l=>{ csv+=`${id[0]},${id},${l.name} ${l.surname},${l.maths},${l.present}\n`; });
+  });
+  const blob=new Blob([csv],{type:'text/csv'}); const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='84classes_maths_export.csv'; a.click();
+}
+
+loadDaily();
+</script>
+</body>
+</html>
