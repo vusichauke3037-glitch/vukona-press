@@ -1,0 +1,6 @@
+Grades: 1 to 12
+For each Grade: Classes A, B, C, D, E, F, G
+Example:
+{ grade: 1, class: "1A", teacher: "T01", learners: 40 }
+...
+{ grade: 12, class: "12G", teacher: "T84", learners: 38 }
